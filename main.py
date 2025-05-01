@@ -1,13 +1,16 @@
 import os
-
 import pandas as pd
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
-
 from ml.data import apply_label, process_data
 from ml.model import inference, load_model
 
-# DO NOT MODIFY
+
+# Initialize FastAPI app
+app = FastAPI()
+
+
+# DO NOT MODIFY: Data model
 class Data(BaseModel):
     age: int = Field(..., example=37)
     workclass: str = Field(..., example="Private")
@@ -26,34 +29,38 @@ class Data(BaseModel):
     hours_per_week: int = Field(..., example=40, alias="hours-per-week")
     native_country: str = Field(..., example="United-States", alias="native-country")
 
-path = None # TODO: enter the path for the saved encoder 
-encoder = load_model(path)
 
-path = None # TODO: enter the path for the saved model 
-model = load_model(path)
+# Set paths for saved encoder, model, scaler, and label binarizer
+project_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+project_path = os.path.join(project_path, "Deploying-a-Scalable-ML-Pipeline-with-FastAPI")
+path_encoder = os.path.join(project_path, "model", "encoder.pkl")
+path_model = os.path.join(project_path, "model", "model.pkl")
+path_scaler = os.path.join(project_path, "model", "scaler.pkl")
+path_lb = os.path.join(project_path, "model", "lb.pkl")
 
-# TODO: create a RESTful API using FastAPI
-app = None # your code here
+encoder = load_model(path_encoder)
+model = load_model(path_model)
+scaler = load_model(path_scaler)
+lb = load_model(path_lb)
 
-# TODO: create a GET on the root giving a welcome message
+
+# GET endpoint at root
 @app.get("/")
 async def get_root():
-    """ Say hello!"""
-    # your code here
-    pass
+    """Return a welcome message."""
+    return {"message": "Welcome to the Adult Income Classifier API!"}
 
 
-# TODO: create a POST on a different path that does model inference
+# POST endpoint for model inference
 @app.post("/data/")
 async def post_inference(data: Data):
-    # DO NOT MODIFY: turn the Pydantic model into a dict.
+    """Perform model inference on input data."""
+    # Convert Pydantic model to DataFrame
     data_dict = data.dict()
-    # DO NOT MODIFY: clean up the dict to turn it into a Pandas DataFrame.
-    # The data has names with hyphens and Python does not allow those as variable names.
-    # Here it uses the functionality of FastAPI/Pydantic/etc to deal with this.
     data = {k.replace("_", "-"): [v] for k, v in data_dict.items()}
     data = pd.DataFrame.from_dict(data)
 
+    # Handle missing values ('?')
     cat_features = [
         "workclass",
         "education",
@@ -64,11 +71,23 @@ async def post_inference(data: Data):
         "sex",
         "native-country",
     ]
+    for col in cat_features:
+        data[col] = data[col].replace('?', data[col].mode()[0])
+
+    # Process data
     data_processed, _, _, _ = process_data(
-        # your code here
-        # use data as data input
-        # use training = False
-        # do not need to pass lb as input
+        X=data,
+        categorical_features=cat_features,
+        label=None,
+        training=False,
+        encoder=encoder,
+        lb=lb
     )
-    _inference = None # your code here to predict the result using data_processed
-    return {"result": apply_label(_inference)}
+
+    # Run inference
+    _inference = inference(model, scaler, data_processed)
+
+    # Convert prediction to label
+    result = apply_label(_inference)
+
+    return {"result": result}
