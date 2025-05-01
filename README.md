@@ -1,3 +1,9 @@
+Github Repository Link:
+https://github.com/Batmabraham/Deploying-a-Scalable-ML-Pipeline-with-FastAPI 
+
+Acknowledgements:
+This project made heavy use of the assistance of Grok AI, made by X
+
 Working in a command line environment is recommended for ease of use with git and dvc. If on Windows, WSL1 or 2 is recommended.
 
 # Environment Set up (pip or conda)
